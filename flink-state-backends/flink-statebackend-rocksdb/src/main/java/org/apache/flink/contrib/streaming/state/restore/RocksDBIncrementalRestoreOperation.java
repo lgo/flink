@@ -24,9 +24,10 @@ import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend.RocksDb
 import org.apache.flink.contrib.streaming.state.RocksDBNativeMetricOptions;
 import org.apache.flink.contrib.streaming.state.RocksDBOperationUtils;
 import org.apache.flink.contrib.streaming.state.RocksDBStateDownloader;
-import org.apache.flink.contrib.streaming.state.RocksDBWriteBatchWrapper;
 import org.apache.flink.contrib.streaming.state.RocksIteratorWrapper;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriter;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileStatus;
@@ -105,7 +106,8 @@ public class RocksDBIncrementalRestoreOperation<K> extends AbstractRocksDBRestor
 		RocksDBNativeMetricOptions nativeMetricOptions,
 		MetricGroup metricGroup,
 		@Nonnull Collection<KeyedStateHandle> restoreStateHandles,
-		@Nonnull RocksDbTtlCompactFiltersManager ttlCompactFiltersManager) {
+		@Nonnull RocksDbTtlCompactFiltersManager ttlCompactFiltersManager,
+		@Nonnull RocksDBWriterFactory writerFactory) {
 		super(keyGroupRange,
 			keyGroupPrefixBytes,
 			numberOfTransferringThreads,
@@ -120,7 +122,8 @@ public class RocksDBIncrementalRestoreOperation<K> extends AbstractRocksDBRestor
 			nativeMetricOptions,
 			metricGroup,
 			restoreStateHandles,
-			ttlCompactFiltersManager);
+			ttlCompactFiltersManager,
+			writerFactory);
 		this.operatorIdentifier = operatorIdentifier;
 		this.restoredSstFiles = new TreeMap<>();
 		this.lastCompletedCheckpointId = -1L;
@@ -294,7 +297,7 @@ public class RocksDBIncrementalRestoreOperation<K> extends AbstractRocksDBRestor
 			try (RestoredDBInstance tmpRestoreDBInfo = restoreDBInstanceFromStateHandle(
 				(IncrementalRemoteKeyedStateHandle) rawStateHandle,
 				temporaryRestoreInstancePath);
-				RocksDBWriteBatchWrapper writeBatchWrapper = new RocksDBWriteBatchWrapper(this.db)) {
+				RocksDBWriter writer = writerFactory.defaultPutWriter(this.db, null)) {
 
 				List<ColumnFamilyDescriptor> tmpColumnFamilyDescriptors = tmpRestoreDBInfo.columnFamilyDescriptors;
 				List<ColumnFamilyHandle> tmpColumnFamilyHandles = tmpRestoreDBInfo.columnFamilyHandles;
@@ -314,7 +317,7 @@ public class RocksDBIncrementalRestoreOperation<K> extends AbstractRocksDBRestor
 						while (iterator.isValid()) {
 
 							if (RocksDBIncrementalCheckpointUtils.beforeThePrefixBytes(iterator.key(), stopKeyGroupPrefixBytes)) {
-								writeBatchWrapper.put(targetColumnFamilyHandle, iterator.key(), iterator.value());
+								writer.put(targetColumnFamilyHandle, iterator.key(), iterator.value());
 							} else {
 								// Since the iterator will visit the record according to the sorted order,
 								// we can just break here.

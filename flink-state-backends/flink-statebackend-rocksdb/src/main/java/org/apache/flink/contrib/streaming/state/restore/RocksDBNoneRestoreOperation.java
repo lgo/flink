@@ -21,6 +21,7 @@ package org.apache.flink.contrib.streaming.state.restore;
 import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend.RocksDbKvStateInfo;
 import org.apache.flink.contrib.streaming.state.RocksDBNativeMetricOptions;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -56,7 +57,8 @@ public class RocksDBNoneRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 		RocksDBNativeMetricOptions nativeMetricOptions,
 		MetricGroup metricGroup,
 		@Nonnull Collection<KeyedStateHandle> restoreStateHandles,
-		@Nonnull RocksDbTtlCompactFiltersManager ttlCompactFiltersManager
+		@Nonnull RocksDbTtlCompactFiltersManager ttlCompactFiltersManager,
+		@Nonnull RocksDBWriterFactory writeFactory
 	) {
 		super(keyGroupRange,
 			keyGroupPrefixBytes,
@@ -72,7 +74,8 @@ public class RocksDBNoneRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 			nativeMetricOptions,
 			metricGroup,
 			restoreStateHandles,
-			ttlCompactFiltersManager);
+			ttlCompactFiltersManager,
+			writeFactory);
 	}
 
 	@Override

@@ -19,7 +19,7 @@
 package org.apache.flink.contrib.streaming.state.benchmark;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.contrib.streaming.state.RocksDBWriteBatchWrapper;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriteBatchWrapper;
 import org.apache.flink.testutils.junit.RetryOnFailure;
 import org.apache.flink.util.TestLogger;
 

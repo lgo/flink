@@ -36,6 +36,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.contrib.streaming.state.iterator.RocksStateKeysIterator;
 import org.apache.flink.contrib.streaming.state.snapshot.RocksDBSnapshotStrategyBase;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriteBatchWrapper;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriter;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
@@ -120,6 +123,9 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 			Tuple2.of(ReducingStateDescriptor.class, (StateFactory) RocksDBReducingState::create),
 			Tuple2.of(FoldingStateDescriptor.class, (StateFactory) RocksDBFoldingState::create)
 		).collect(Collectors.toMap(t -> t.f0, t -> t.f1));
+
+	/** Factory to create a {@link org.apache.flink.contrib.streaming.state.writer.RocksDBWriter}, for doing batch-writes to {@link RocksDB}. */
+	private final RocksDBWriterFactory writeFactory;
 
 	private interface StateFactory {
 		<K, N, SV, S extends State, IS extends S> IS createState(
@@ -213,13 +219,13 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		ResourceGuard rocksDBResourceGuard,
 		RocksDBSnapshotStrategyBase<K> checkpointSnapshotStrategy,
 		RocksDBSnapshotStrategyBase<K> savepointSnapshotStrategy,
-		RocksDBWriteBatchWrapper writeBatchWrapper,
 		ColumnFamilyHandle defaultColumnFamilyHandle,
 		RocksDBNativeMetricMonitor nativeMetricMonitor,
 		RocksDBSerializedCompositeKeyBuilder<K> sharedRocksKeyBuilder,
 		PriorityQueueSetFactory priorityQueueFactory,
 		RocksDbTtlCompactFiltersManager ttlCompactFiltersManager,
-		InternalKeyContext<K> keyContext) {
+		InternalKeyContext<K> keyContext,
+		@Nonnull RocksDBWriterFactory writeFactory) {
 
 		super(
 			kvStateRegistry,
@@ -243,12 +249,14 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		this.keyGroupPrefixBytes = keyGroupPrefixBytes;
 		this.kvStateInformation = kvStateInformation;
 
+		// @lgo: fixme should this instead be configured elsewhere?
 		this.writeOptions = new WriteOptions().setDisableWAL(true);
+		this.writeFactory = writeFactory;
 		this.db = db;
 		this.rocksDBResourceGuard = rocksDBResourceGuard;
 		this.checkpointSnapshotStrategy = checkpointSnapshotStrategy;
 		this.savepointSnapshotStrategy = savepointSnapshotStrategy;
-		this.writeBatchWrapper = writeBatchWrapper;
+		this.writeBatchWrapper = writeFactory.writeBatchWriter(this.db, this.writeOptions);
 		this.defaultColumnFamily = defaultColumnFamilyHandle;
 		this.nativeMetricMonitor = nativeMetricMonitor;
 		this.sharedRocksKeyBuilder = sharedRocksKeyBuilder;
@@ -396,6 +404,10 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
 	public WriteOptions getWriteOptions() {
 		return writeOptions;
+	}
+
+	public RocksDBWriterFactory getWriteFactory() {
+		return writeFactory;
 	}
 
 	RocksDBSerializedCompositeKeyBuilder<K> getSharedRocksKeyBuilder() {
@@ -591,7 +603,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		Snapshot rocksDBSnapshot = db.getSnapshot();
 		try (
 			RocksIteratorWrapper iterator = RocksDBOperationUtils.getRocksIterator(db, stateMetaInfo.f0);
-			RocksDBWriteBatchWrapper batchWriter = new RocksDBWriteBatchWrapper(db, getWriteOptions())
+			RocksDBWriter writer = writeFactory.defaultPutWriter(db, getWriteOptions())
 		) {
 			iterator.seekToFirst();
 
@@ -606,7 +618,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 					stateMetaInfo.f1.getPreviousStateSerializer(),
 					stateMetaInfo.f1.getStateSerializer());
 
-				batchWriter.put(stateMetaInfo.f0, iterator.key(), migratedSerializedValueOutput.getCopyOfBuffer());
+				writer.put(stateMetaInfo.f0, iterator.key(), migratedSerializedValueOutput.getCopyOfBuffer());
 
 				migratedSerializedValueOutput.clear();
 				iterator.next();

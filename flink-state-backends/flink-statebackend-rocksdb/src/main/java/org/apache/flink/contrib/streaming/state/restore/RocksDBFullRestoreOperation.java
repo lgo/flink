@@ -22,8 +22,9 @@ import org.apache.flink.api.common.typeutils.base.array.BytePrimitiveArraySerial
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend.RocksDbKvStateInfo;
 import org.apache.flink.contrib.streaming.state.RocksDBNativeMetricOptions;
-import org.apache.flink.contrib.streaming.state.RocksDBWriteBatchWrapper;
 import org.apache.flink.contrib.streaming.state.ttl.RocksDbTtlCompactFiltersManager;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriter;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputView;
@@ -102,7 +103,8 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 		RocksDBNativeMetricOptions nativeMetricOptions,
 		MetricGroup metricGroup,
 		@Nonnull Collection<KeyedStateHandle> restoreStateHandles,
-		@Nonnull RocksDbTtlCompactFiltersManager ttlCompactFiltersManager) {
+		@Nonnull RocksDbTtlCompactFiltersManager ttlCompactFiltersManager,
+		@Nonnull RocksDBWriterFactory writerFactory) {
 		super(
 			keyGroupRange,
 			keyGroupPrefixBytes,
@@ -118,7 +120,8 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 			nativeMetricOptions,
 			metricGroup,
 			restoreStateHandles,
-			ttlCompactFiltersManager);
+			ttlCompactFiltersManager,
+			writerFactory);
 	}
 
 	/**
@@ -188,7 +191,9 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 	 */
 	private void restoreKVStateData() throws IOException, RocksDBException {
 		//for all key-groups in the current state handle...
-		try (RocksDBWriteBatchWrapper writeBatchWrapper = new RocksDBWriteBatchWrapper(db)) {
+		try (
+			RocksDBWriter writer = writerFactory.defaultPutWriter(db, null)
+		) {
 			for (Tuple2<Integer, Long> keyGroupOffset : currentKeyGroupsStateHandle.getGroupRangeOffsets()) {
 				int keyGroup = keyGroupOffset.f0;
 
@@ -213,7 +218,7 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 							if (hasMetaDataFollowsFlag(key)) {
 								//clear the signal bit in the key to make it ready for insertion again
 								clearMetaDataFollowsFlag(key);
-								writeBatchWrapper.put(handle, key, value);
+								writer.put(handle, key, value);
 								//TODO this could be aware of keyGroupPrefixBytes and write only one byte if possible
 								kvStateId = END_OF_KEY_GROUP_MARK
 									& compressedKgInputView.readShort();
@@ -223,12 +228,13 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 									handle = currentStateHandleKVStateColumnFamilies.get(kvStateId);
 								}
 							} else {
-								writeBatchWrapper.put(handle, key, value);
+								writer.put(handle, key, value);
 							}
 						}
 					}
 				}
 			}
+
 		}
 	}
 }

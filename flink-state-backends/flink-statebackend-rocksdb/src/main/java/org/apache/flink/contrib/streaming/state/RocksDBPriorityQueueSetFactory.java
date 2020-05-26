@@ -19,6 +19,7 @@ package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriteBatchWrapper;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.runtime.state.KeyExtractorFunction;
@@ -106,7 +107,7 @@ public class RocksDBPriorityQueueSetFactory implements PriorityQueueSetFactory {
 
 		final ColumnFamilyHandle columnFamilyHandle = stateCFHandle.columnFamilyHandle;
 
-		return new KeyGroupPartitionedPriorityQueue<>(
+		return new KeyGroupPartitionedPriorityQueue<T, RocksDBCachingPriorityQueueSet<T>>(
 			KeyExtractorFunction.forKeyedObjects(),
 			PriorityComparator.forPriorityComparableObjects(),
 			new KeyGroupPartitionedPriorityQueue.PartitionQueueSetFactory<T, RocksDBCachingPriorityQueueSet<T>>() {
