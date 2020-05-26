@@ -20,6 +20,7 @@ package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.description.Description;
+import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 
 import java.io.Serializable;
 
@@ -130,4 +131,24 @@ public class RocksDBConfigurableOptions implements Serializable {
 		.defaultValue(MemorySize.parse("2mb"))
 		.withDescription("The max size of the consumed memory for RocksDB batch write, " +
 			"will flush just based on item count if this config set to 0.");
+
+
+	public static final ConfigOption<WriteBatchMechanism> WRITE_BATCH_MECHANISM =
+		key("state.backend.rocksdb.experimental.write-batch-mechanism")
+		.enumType(WriteBatchMechanism.class)
+		.defaultValue(WriteBatchMechanism.SST_INGEST)
+		.withDescription(String.format(
+			"The write batch mechanism to use when writing to RocksDB. Options are %s and %s (default).",
+			WriteBatchMechanism.SST_INGEST.name(), WriteBatchMechanism.WRITE_BATCH.name()
+		));
+
+	public static final ConfigOption<MemorySize> SST_WRITER_SST_MAX_SIZE =
+		key("state.backend.rocksdb.experimental.sst-writer.sst-max-size")
+		.memoryType()
+		.defaultValue(MemorySize.parse("16mb"))
+		.withDescription(
+			String.format("The max size to use for writing SST files using the %s batch writing mechanism.",
+				WriteBatchMechanism.SST_INGEST.name()
+			)
+		);
 }

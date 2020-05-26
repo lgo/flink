@@ -46,6 +46,7 @@ import org.apache.flink.util.StateMigrationException;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
 
 import javax.annotation.Nonnull;
@@ -192,7 +193,9 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 	private void restoreKVStateData() throws IOException, RocksDBException {
 		//for all key-groups in the current state handle...
 		try (
-			RocksDBWriter writer = writerFactory.defaultPutWriter(db, null)
+			ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
+			Options options = new Options(dbOptions, columnFamilyOptions);
+			RocksDBWriter writer = writerFactory.defaultPutWriter(db, options, null, null)
 		) {
 			for (Tuple2<Integer, Long> keyGroupOffset : currentKeyGroupsStateHandle.getGroupRangeOffsets()) {
 				int keyGroup = keyGroupOffset.f0;

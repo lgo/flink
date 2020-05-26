@@ -603,7 +603,8 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 		Snapshot rocksDBSnapshot = db.getSnapshot();
 		try (
 			RocksIteratorWrapper iterator = RocksDBOperationUtils.getRocksIterator(db, stateMetaInfo.f0);
-			RocksDBWriter writer = writeFactory.defaultPutWriter(db, getWriteOptions())
+			// @lgo: fixme plumb through options and envOptions.
+			RocksDBWriter writer = writeFactory.defaultPutWriter(db, null, null, getWriteOptions())
 		) {
 			iterator.seekToFirst();
 
