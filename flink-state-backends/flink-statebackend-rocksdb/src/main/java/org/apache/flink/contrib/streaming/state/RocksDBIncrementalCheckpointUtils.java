@@ -114,21 +114,17 @@ public class RocksDBIncrementalCheckpointUtils {
 		byte[] endKeyBytes) throws RocksDBException {
 
 		for (ColumnFamilyHandle columnFamilyHandle : columnFamilyHandles) {
-			try (RocksIteratorWrapper iteratorWrapper = RocksDBOperationUtils.getRocksIterator(db, columnFamilyHandle);
-				RocksDBWriteBatchWrapper writeBatchWrapper = new RocksDBWriteBatchWrapper(db)) {
-
-				iteratorWrapper.seek(beginKeyBytes);
-
-				while (iteratorWrapper.isValid()) {
-					final byte[] currentKey = iteratorWrapper.key();
-					if (beforeThePrefixBytes(currentKey, endKeyBytes)) {
-						writeBatchWrapper.remove(columnFamilyHandle, currentKey);
-					} else {
-						break;
-					}
-					iteratorWrapper.next();
-				}
-			}
+			// @lgo: test and ensure this is speedy. This should be because it
+			// is using RocksDB tombstones.
+			//
+			// @lgo: document this change further.
+			//
+			// Additionally, see the notes on the RocksDB method for other details
+			// about tombstones. ie: collecting too many tombstones without
+			// compaction can cause degraded performance.
+			//
+			// https://github.com/facebook/rocksdb/blob/bcd32560dd5898956b9d24553c2bb3c1b1d2319f/include/rocksdb/db.h#L357-L371
+			db.deleteRange(columnFamilyHandle, beginKeyBytes, endKeyBytes);
 		}
 	}
 
