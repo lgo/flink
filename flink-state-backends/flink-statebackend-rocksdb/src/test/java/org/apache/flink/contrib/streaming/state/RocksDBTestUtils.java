@@ -21,6 +21,7 @@ package org.apache.flink.contrib.streaming.state;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.execution.Environment;
@@ -95,7 +96,8 @@ public final class RocksDBTestUtils {
                 UncompressedStreamCompressionDecorator.INSTANCE,
                 db,
                 defaultCFHandle,
-                new CloseableRegistry());
+                new CloseableRegistry(),
+                new RocksDBWriterFactory());
     }
 
     public static <K> RocksDBKeyedStateBackend<K> createKeyedStateBackend(
@@ -114,6 +116,7 @@ public final class RocksDBTestUtils {
                         TtlTimeProvider.DEFAULT,
                         new UnregisteredMetricsGroup(),
                         Collections.emptyList(),
-                        new CloseableRegistry());
+                        new CloseableRegistry(),
+                        new RocksDBWriterFactory());
     }
 }
