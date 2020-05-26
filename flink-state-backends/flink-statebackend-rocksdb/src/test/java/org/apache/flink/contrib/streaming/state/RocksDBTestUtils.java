@@ -65,7 +65,8 @@ public final class RocksDBTestUtils {
                 new UnregisteredMetricsGroup(),
                 Collections.emptyList(),
                 UncompressedStreamCompressionDecorator.INSTANCE,
-                new CloseableRegistry());
+                new CloseableRegistry(),
+                new RocksDBWriterFactory());
     }
 
     public static <K> RocksDBKeyedStateBackendBuilder<K> builderForTestDB(
@@ -116,7 +117,6 @@ public final class RocksDBTestUtils {
                         TtlTimeProvider.DEFAULT,
                         new UnregisteredMetricsGroup(),
                         Collections.emptyList(),
-                        new CloseableRegistry(),
-                        new RocksDBWriterFactory());
+                        new CloseableRegistry());
     }
 }

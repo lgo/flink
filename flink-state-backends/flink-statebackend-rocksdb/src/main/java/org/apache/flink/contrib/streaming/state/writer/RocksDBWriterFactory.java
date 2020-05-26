@@ -18,6 +18,10 @@
 
 package org.apache.flink.contrib.streaming.state.writer;
 
+import org.apache.flink.util.Preconditions;
+
+import org.rocksdb.EnvOptions;
+import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.WriteOptions;
 
@@ -27,40 +31,75 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_SIZE;
 
 /**
  * {@link RocksDBWriterFactory} creates writers for {@link RocksDB}. It is initialized from an
  * application's configuration, and provides a default {@link RocksDBWriter} (for Put operations),
- * as well as specific constructors {@link RocksDBWriteBatchWrapper}.
+ * as well as specific constructors for {@link RocksDBSSTIngestWriter} and {@link
+ * RocksDBWriteBatchWrapper} which each provide different capabilities.
+ *
+ * <p>See {@link RocksDBSSTIngestWriter} and {@link RocksDBWriteBatchWrapper} for details about the
+ * writers, and when they should be used.
  */
 public class RocksDBWriterFactory {
 
+    private final WriteBatchMechanism mechanism;
     private final long writeBatchSize;
 
     private final File tempDir = null;
 
-    /** Provides a factory for {@link RocksDBWriter}. */
-    public RocksDBWriterFactory(long writeBatchSize) {
+    /**
+     * Provides a factory for various {@link RocksDBWriter}, including {@link
+     * RocksDBWriteBatchWrapper} and {@link RocksDBSSTIngestWriter}. The factory also provides a
+     * "default" writer, determined by configuration parameters, so that factory callers do not need
+     * to be concerned with the implementation.
+     *
+     * @param mechanism The {@link WriteBatchMechanism} which determines the default writer returned
+     *     by {@link #defaultPutWriter(RocksDB, Options, EnvOptions, WriteOptions)}.
+     * @param writeBatchSize A parameter for {@link RocksDBWriteBatchWrapper}.
+     */
+    public RocksDBWriterFactory(WriteBatchMechanism mechanism, long writeBatchSize) {
+        this.mechanism = mechanism;
         this.writeBatchSize = writeBatchSize;
     }
 
-    // @lgo: fixme used for tests that pull all default configured values.
+    // used for tests that pull all default configured values.
     public RocksDBWriterFactory() {
+        this.mechanism = WRITE_BATCH_MECHANISM.defaultValue();
         this.writeBatchSize = WRITE_BATCH_SIZE.defaultValue().getBytes();
     }
 
     /**
-     * Returns a new {@link RocksDBWriter}, using the user-configured parameters.
+     * Returns a new {@link RocksDBWriter}, using the user-configured parameters. Depending on the
+     * configuration, a {@link RocksDBWriteBatchWrapper} or {@link RocksDBSSTIngestWriter} may be
+     * used.
      *
      * @param db the {@link RocksDB} instance to write to.
+     * @param options the {@link Options} to use when writing (only applicable for {@link
+     *     RocksDBSSTIngestWriter})
+     * @param envOptions the {@link EnvOptions} to use when writing (only applicable for {@link
+     *     RocksDBSSTIngestWriter})
      * @param writeOptions the {@link WriteOptions} to use when writing (only applicable for {@link
      *     RocksDBWriteBatchWrapper})
      * @return a new {@link RocksDBWriter} for {@code put} writes to the database.
      */
-    public RocksDBWriter defaultPutWriter(@Nonnull RocksDB db, @Nullable WriteOptions writeOptions)
+    public RocksDBWriter defaultPutWriter(
+            @Nonnull RocksDB db,
+            @Nullable Options options,
+            @Nullable EnvOptions envOptions,
+            @Nullable WriteOptions writeOptions)
             throws IOException {
-        return writeBatchWriter(db, writeOptions);
+        switch (mechanism) {
+            case WRITE_BATCH:
+                return writeBatchWriter(db, writeOptions);
+            case SST_INGEST:
+                return sstIngestWriter(db, options, envOptions);
+            default:
+                Preconditions.checkState(false, "unexpected WriteBatchMechanism option");
+                return null;
+        }
     }
 
     /**
@@ -86,5 +125,22 @@ public class RocksDBWriterFactory {
     public RocksDBWriteBatchWrapper writeBatchWriter(
             @Nonnull RocksDB db, @Nullable WriteOptions writeOptions) {
         return new RocksDBWriteBatchWrapper(db, writeOptions, writeBatchSize);
+    }
+
+    /**
+     * Returns a new {@link RocksDBSSTIngestWriter}, using the user-configured parameters.
+     *
+     * @param db the {@link RocksDB} instance to write to.
+     * @param options the {@link Options} to use for writing.
+     * @param envOptions the {@link EnvOptions} to use for writing.
+     * @return a new {@link RocksDBSSTIngestWriter} for writing to the {@code db}.
+     */
+    public RocksDBSSTIngestWriter sstIngestWriter(
+            @Nonnull RocksDB db, @Nullable Options options, @Nullable EnvOptions envOptions)
+            throws IOException {
+        // @lgo: allow passing directory.
+        // @lgo: plumb through parameters.
+        final int maxSstSize = 10;
+        return new RocksDBSSTIngestWriter(db, maxSstSize, envOptions, options, tempDir);
     }
 }

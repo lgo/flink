@@ -309,7 +309,8 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
                 }
             }
 
-            writeBatchWriter = getWriterFactory().writeBatchWriter(db, writeOptions);
+            writeBatchWriter =
+                    getWriterFactory().writeBatchWriter(db, optionsContainer.getWriteOptions());
             // it is important that we only create the key builder after the restore, and not
             // before;
             // restore operations may reconfigure the key serializer, so accessing the key
