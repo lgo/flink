@@ -195,6 +195,7 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 		try (
 			ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
 			Options options = new Options(dbOptions, columnFamilyOptions);
+			// @lgo: fixme plumb through envOptions and writeOptions.
 			RocksDBWriter writer = writerFactory.defaultPutWriter(db, options, null, null)
 		) {
 			for (Tuple2<Integer, Long> keyGroupOffset : currentKeyGroupsStateHandle.getGroupRangeOffsets()) {

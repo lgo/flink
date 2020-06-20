@@ -29,6 +29,8 @@ import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackendBuilder;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.contrib.streaming.state.RocksDBTestUtils;
+import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.queryablestate.client.VoidNamespace;
 import org.apache.flink.queryablestate.client.VoidNamespaceSerializer;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
@@ -47,12 +49,26 @@ import org.rocksdb.DBOptions;
 import java.util.Collections;
 
 import static org.mockito.Mockito.mock;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Additional tests for the serialization and deserialization using
  * the KvStateSerializer with a RocksDB state back-end.
  */
 public final class KVStateRequestSerializerRocksDBTest {
+
+	@Parameters(name = "WriteBatchMechanism={0}")
+	public static List<Object> writeBatchMechanisms() {
+		return Arrays.asList(WriteBatchMechanism.values());
+	}
+
+	@Parameter
+	public WriteBatchMechanism writeBatchMechanism;
+
 
 	@Rule
 	public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -90,7 +106,8 @@ public final class KVStateRequestSerializerRocksDBTest {
 				new UnregisteredMetricsGroup(),
 				Collections.emptyList(),
 				AbstractStateBackend.getCompressionDecorator(executionConfig),
-				new CloseableRegistry()
+				new CloseableRegistry(),
+				writeBatchMechanism
 			).build();
 		longHeapKeyedStateBackend.setCurrentKey(key);
 
@@ -134,7 +151,8 @@ public final class KVStateRequestSerializerRocksDBTest {
 				new UnregisteredMetricsGroup(),
 				Collections.emptyList(),
 				AbstractStateBackend.getCompressionDecorator(executionConfig),
-				new CloseableRegistry()
+				new CloseableRegistry(),
+				writeBatchMechanism
 			).build();
 		longHeapKeyedStateBackend.setCurrentKey(key);
 

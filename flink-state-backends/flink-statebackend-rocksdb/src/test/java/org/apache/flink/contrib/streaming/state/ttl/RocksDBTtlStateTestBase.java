@@ -59,7 +59,7 @@ public abstract class RocksDBTtlStateTestBase extends TtlStateTestBase {
 
 	abstract StateBackend createStateBackend();
 
-	StateBackend createStateBackend(TernaryBoolean enableIncrementalCheckpointing) {
+	RocksDBStateBackend createStateBackend(TernaryBoolean enableIncrementalCheckpointing) {
 		String dbPath;
 		String checkpointPath;
 		try {

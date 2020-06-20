@@ -27,6 +27,8 @@ import org.apache.flink.runtime.state.heap.KeyGroupPartitionedPriorityQueue;
 
 import org.junit.Rule;
 
+import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM;
+
 /**
  * Test of {@link KeyGroupPartitionedPriorityQueue} powered by a {@link RocksDBCachingPriorityQueueSet}.
  */
@@ -57,7 +59,7 @@ public class KeyGroupPartitionedPriorityQueueWithRocksDBStoreTest extends Intern
 			DataInputDeserializer inputStreamWithPos = new DataInputDeserializer();
 			int keyGroupPrefixBytes = RocksDBKeySerializationUtils.computeRequiredBytesInKeyGroupPrefix(numKeyGroups);
 			TreeOrderedSetCache orderedSetCache = new TreeOrderedSetCache(32);
-			RocksDBWriterFactory writeFactory = new RocksDBWriterFactory();
+			RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(WRITE_BATCH_MECHANISM.defaultValue());
 			return new RocksDBCachingPriorityQueueSet<>(
 				keyGroupId,
 				keyGroupPrefixBytes,

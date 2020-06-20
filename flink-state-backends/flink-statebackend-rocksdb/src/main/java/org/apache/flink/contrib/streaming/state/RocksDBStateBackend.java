@@ -518,7 +518,7 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 		LocalRecoveryConfig localRecoveryConfig =
 			env.getTaskStateManager().createLocalRecoveryConfig();
 
-		final RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(getWriteBatchMechanism(), getWriteBatchSize());
+		final RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(getWriteBatchMechanism(), getWriteBatchSize(), tempDir);
 
 		ExecutionConfig executionConfig = env.getExecutionConfig();
 		StreamCompressionDecorator keyGroupCompressionDecorator = getCompressionDecorator(executionConfig);

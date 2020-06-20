@@ -34,6 +34,7 @@ import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackendBuilder;
 import org.apache.flink.contrib.streaming.state.RocksDBResourceContainer;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
+import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
@@ -67,20 +68,20 @@ public class StateBackendBenchmarkUtils {
 	private static final String dbDirName = "dbPath";
 	private static File rootDir;
 
-	public static KeyedStateBackend<Long> createKeyedStateBackend(StateBackendType backendType) throws IOException {
+	public static KeyedStateBackend<Long> createKeyedStateBackend(StateBackendType backendType, WriteBatchMechanism writeBatchMechanism) throws IOException {
 		switch (backendType) {
 			case HEAP:
 				rootDir = prepareDirectory(rootDirName, null);
 				return createHeapKeyedStateBackend(rootDir);
 			case ROCKSDB:
 				rootDir = prepareDirectory(rootDirName, null);
-				return createRocksDBKeyedStateBackend(rootDir);
+				return createRocksDBKeyedStateBackend(rootDir, writeBatchMechanism);
 			default:
 				throw new IllegalArgumentException("Unknown backend type: " + backendType);
 		}
 	}
 
-	private static RocksDBKeyedStateBackend<Long> createRocksDBKeyedStateBackend(File rootDir) throws IOException {
+	private static RocksDBKeyedStateBackend<Long> createRocksDBKeyedStateBackend(File rootDir, WriteBatchMechanism writeBatchMechanism) throws IOException {
 		File recoveryBaseDir = prepareDirectory(recoveryDirName, rootDir);
 		File dbPathFile = prepareDirectory(dbDirName, rootDir);
 		ExecutionConfig executionConfig = new ExecutionConfig();
@@ -103,7 +104,7 @@ public class StateBackendBenchmarkUtils {
 			Collections.emptyList(),
 			AbstractStateBackend.getCompressionDecorator(executionConfig),
 			new CloseableRegistry(),
-			new RocksDBWriterFactory());
+			new RocksDBWriterFactory(writeBatchMechanism));
 		try {
 			return builder.build();
 		} catch (Exception e) {

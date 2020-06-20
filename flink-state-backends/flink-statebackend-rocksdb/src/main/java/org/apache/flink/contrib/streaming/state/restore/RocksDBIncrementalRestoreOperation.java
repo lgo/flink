@@ -300,6 +300,7 @@ public class RocksDBIncrementalRestoreOperation<K> extends AbstractRocksDBRestor
 				temporaryRestoreInstancePath);
 				ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
 				Options options = new Options(dbOptions, columnFamilyOptions);
+				// @lgo: fixme plumb through envOptions and writeOptions.
 				RocksDBWriter writer = writerFactory.defaultPutWriter(db, options, null, null)) {
 
 				List<ColumnFamilyDescriptor> tmpColumnFamilyDescriptors = tmpRestoreDBInfo.columnFamilyDescriptors;
