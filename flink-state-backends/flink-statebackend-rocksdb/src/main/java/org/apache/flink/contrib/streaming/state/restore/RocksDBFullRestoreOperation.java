@@ -144,6 +144,7 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
         // for all key-groups in the current state handle...
         try (ColumnFamilyOptions columnFamilyOptions = new ColumnFamilyOptions();
                 Options options = new Options(dbOptions, columnFamilyOptions);
+                // @lgo: fixme plumb through envOptions and writeOptions.
                 RocksDBWriter writer = writerFactory.defaultPutWriter(db, options, null, null)) {
             while (keyGroups.hasNext()) {
                 KeyGroup keyGroup = keyGroups.next();

@@ -576,7 +576,7 @@ public class RocksDBStateBackend extends AbstractManagedMemoryStateBackend
         final RocksDBResourceContainer resourceContainer =
                 createOptionsAndResourceContainer(sharedResources);
         final RocksDBWriterFactory writeFactory =
-                new RocksDBWriterFactory(getWriteBatchMechanism(), getWriteBatchSize());
+                new RocksDBWriterFactory(getWriteBatchMechanism(), getWriteBatchSize(), tempDir);
 
         ExecutionConfig executionConfig = env.getExecutionConfig();
         StreamCompressionDecorator keyGroupCompressionDecorator =

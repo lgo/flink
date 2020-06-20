@@ -22,6 +22,7 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
+import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.execution.Environment;
@@ -44,7 +45,9 @@ import java.util.Collections;
 public final class RocksDBTestUtils {
 
     public static <K> RocksDBKeyedStateBackendBuilder<K> builderForTestDefaults(
-            File instanceBasePath, TypeSerializer<K> keySerializer) {
+            File instanceBasePath,
+            TypeSerializer<K> keySerializer,
+            WriteBatchMechanism writeBatchMechanism) {
 
         final RocksDBResourceContainer optionsContainer = new RocksDBResourceContainer();
 
@@ -66,7 +69,7 @@ public final class RocksDBTestUtils {
                 Collections.emptyList(),
                 UncompressedStreamCompressionDecorator.INSTANCE,
                 new CloseableRegistry(),
-                new RocksDBWriterFactory());
+                new RocksDBWriterFactory(writeBatchMechanism));
     }
 
     public static <K> RocksDBKeyedStateBackendBuilder<K> builderForTestDB(
@@ -74,7 +77,8 @@ public final class RocksDBTestUtils {
             TypeSerializer<K> keySerializer,
             RocksDB db,
             ColumnFamilyHandle defaultCFHandle,
-            ColumnFamilyOptions columnFamilyOptions) {
+            ColumnFamilyOptions columnFamilyOptions,
+            WriteBatchMechanism writeBatchMechanism) {
 
         final RocksDBResourceContainer optionsContainer = new RocksDBResourceContainer();
 
@@ -98,7 +102,7 @@ public final class RocksDBTestUtils {
                 db,
                 defaultCFHandle,
                 new CloseableRegistry(),
-                new RocksDBWriterFactory());
+                new RocksDBWriterFactory(writeBatchMechanism));
     }
 
     public static <K> RocksDBKeyedStateBackend<K> createKeyedStateBackend(

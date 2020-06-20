@@ -18,6 +18,7 @@
 
 package org.apache.flink.contrib.streaming.state.writer;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.Preconditions;
 
 import org.rocksdb.EnvOptions;
@@ -31,7 +32,6 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 
-import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM;
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_SIZE;
 
 /**
@@ -48,27 +48,37 @@ public class RocksDBWriterFactory {
     private final WriteBatchMechanism mechanism;
     private final long writeBatchSize;
 
-    private final File tempDir = null;
+    private final File tempDir;
 
     /**
-     * Provides a factory for various {@link RocksDBWriter}, including {@link
-     * RocksDBWriteBatchWrapper} and {@link RocksDBSSTIngestWriter}. The factory also provides a
-     * "default" writer, determined by configuration parameters, so that factory callers do not need
-     * to be concerned with the implementation.
+     * Provides a factory for {@link RocksDBWriter}, including {@link RocksDBWriteBatchWrapper} and
+     * {@link RocksDBSSTIngestWriter}. The factory also provides a "default" writer, determined by
+     * configuration parameters, so that factory callers do not need to be concerned with the
+     * implementation.
      *
      * @param mechanism The {@link WriteBatchMechanism} which determines the default writer returned
      *     by {@link #defaultPutWriter(RocksDB, Options, EnvOptions, WriteOptions)}.
      * @param writeBatchSize A parameter for {@link RocksDBWriteBatchWrapper}.
+     * @param tempDir THe temporary directory to write sst files to.
      */
-    public RocksDBWriterFactory(WriteBatchMechanism mechanism, long writeBatchSize) {
+    public RocksDBWriterFactory(
+            WriteBatchMechanism mechanism, long writeBatchSize, String tempDir) {
         this.mechanism = mechanism;
         this.writeBatchSize = writeBatchSize;
+        this.tempDir = new File(tempDir);
     }
 
-    // used for tests that pull all default configured values.
-    public RocksDBWriterFactory() {
-        this.mechanism = WRITE_BATCH_MECHANISM.defaultValue();
+    /**
+     * Provides a factory for {@link RocksDBWriter}.
+     *
+     * <p>This is only used in tests, where the tests pull some default configuration values but
+     * provide the mechanism being tested. Tests should parameterize {@link WriteBatchMechanism}.
+     */
+    @VisibleForTesting
+    public RocksDBWriterFactory(WriteBatchMechanism writeBatchMechanism) {
+        this.mechanism = writeBatchMechanism;
         this.writeBatchSize = WRITE_BATCH_SIZE.defaultValue().getBytes();
+        this.tempDir = null;
     }
 
     /**
@@ -138,7 +148,26 @@ public class RocksDBWriterFactory {
     public RocksDBSSTIngestWriter sstIngestWriter(
             @Nonnull RocksDB db, @Nullable Options options, @Nullable EnvOptions envOptions)
             throws IOException {
-        // @lgo: allow passing directory.
+        // @lgo: plumb through parameters.
+        final int maxSstSize = 10;
+        return new RocksDBSSTIngestWriter(db, maxSstSize, envOptions, options, this.tempDir);
+    }
+
+    /**
+     * Returns a new {@link RocksDBSSTIngestWriter}, using the user-configured parameters.
+     *
+     * @param db the {@link RocksDB} instance to write to.
+     * @param options the {@link Options} to use for writing.
+     * @param envOptions the {@link EnvOptions} to use for writing.
+     * @param tempDir the temporary directory to use when constructing sst files.
+     * @return a new {@link RocksDBSSTIngestWriter} for writing to the {@code db}.
+     */
+    public RocksDBSSTIngestWriter sstIngestWriter(
+            @Nonnull RocksDB db,
+            @Nullable Options options,
+            @Nullable EnvOptions envOptions,
+            @Nonnull File tempDir)
+            throws IOException {
         // @lgo: plumb through parameters.
         final int maxSstSize = 10;
         return new RocksDBSSTIngestWriter(db, maxSstSize, envOptions, options, tempDir);

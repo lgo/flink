@@ -26,7 +26,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.WriteOptions;
 
@@ -65,8 +64,8 @@ public class RocksDBSSTIngestWriterTest {
         }
 
         try (RocksDB db = RocksDB.open(folder.newFolder().getAbsolutePath());
+                // @lgo: fixme: plumb through options and ingestOptions.
                 WriteOptions options = new WriteOptions().setDisableWAL(true);
-                IngestExternalFileOptions ingestOptions = new IngestExternalFileOptions();
                 ColumnFamilyHandle firstHandle =
                         db.createColumnFamily(
                                 new ColumnFamilyDescriptor("test-handle-1".getBytes()));

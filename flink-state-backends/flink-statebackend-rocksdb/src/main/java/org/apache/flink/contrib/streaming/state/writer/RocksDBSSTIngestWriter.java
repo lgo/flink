@@ -42,19 +42,16 @@ import java.util.List;
 /**
  * {@link RocksDBSSTIngestWriter} implements {@link RocksDBWriter}, providing writes by creating sst
  * files and instructing {@link RocksDB} to ingest them (via {@link
- * RocksDB#ingestExternalFile(ColumnFamilyHandle, List, IngestExternalFileOptions)}).
- *
- * <p>{@link RocksDBSSTIngestWriter} supports writing to multiple {@link ColumnFamilyHandle},
- * assuming the writes within a {@link ColumnFamilyHandle} are ordered.
- *
- * <p>It uses {@link RocksDBSSTWriter} for creating the sst file of a {@link ColumnFamilyHandle}.
+ * RocksDB#ingestExternalFile(ColumnFamilyHandle, List, IngestExternalFileOptions)}). It supports
+ * writing to multiple {@link ColumnFamilyHandle}, assuming the writes within a {@link
+ * ColumnFamilyHandle} are ordered.
  *
  * <p>IMPORTANT: This class is not thread safe.
  *
- * <p>@lgo: describe in detail what this writer is good for. (only Puts, no more atomicity than the
- * other) => note: this writer does not have completely atomic operations. If a failure occurs
- * between ingested files (being flushed), the RocksDB state will be left with partial writes. It is
- * unclear if this is a problem for Flink, but it should be tested.
+ * <p>It uses {@link RocksDBSSTWriter} for creating the sst file of a {@link ColumnFamilyHandle}.
+ *
+ * <p>{@link RocksDBSSTIngestWriter} is for batch write operations. It produces and ingests
+ * individual files throughout put operations, so it will not atomically commit data.
  */
 public class RocksDBSSTIngestWriter implements RocksDBWriter {
 
@@ -72,7 +69,7 @@ public class RocksDBSSTIngestWriter implements RocksDBWriter {
                     // one-off files for import, it does not matter if the are moved and
                     // import fails.
                     //
-                    // @lgo: ensure this does not cause stray RocksDB sst files on a host when
+                    // @lgo: fixme ensure this does not cause stray RocksDB sst files on a host when
                     // ingestion
                     // fails.
                     /* moveFiles */ true,
@@ -88,7 +85,7 @@ public class RocksDBSSTIngestWriter implements RocksDBWriter {
                     /* allowBlockingFlush */ false);
 
     /** {@code maxSstSize} is the maximum size of an sst file before flushing it. */
-    private final int maxSstSize;
+    private final long maxSstSize;
 
     /**
      * {@code envOptions} are the {@link EnvOptions} provided to the underlying {@link
@@ -115,6 +112,12 @@ public class RocksDBSSTIngestWriter implements RocksDBWriter {
     private final HashMap<Integer, RocksDBSSTWriter> columnFamilyWriters = new HashMap<>();
 
     /**
+     * {@code sstFileSizes} contains the current byte-sizes for the currently opened {@link
+     * RocksDBSSTWriter}, for each {@link ColumnFamilyHandle}.
+     */
+    private final HashMap<Integer, Long> sstFileSizes = new HashMap<>();
+
+    /**
      * {@code ingestionTempDir} is the directory used to write temporary sst files before ingesting
      * them into {@link RocksDB}.
      */
@@ -122,7 +125,7 @@ public class RocksDBSSTIngestWriter implements RocksDBWriter {
 
     public RocksDBSSTIngestWriter(
             @Nonnull RocksDB rocksDB,
-            @Nonnegative int maxSstSize,
+            @Nonnegative long maxSstSize,
             @Nullable EnvOptions envOptions,
             @Nullable Options options,
             @Nullable File tempDir)
@@ -153,6 +156,10 @@ public class RocksDBSSTIngestWriter implements RocksDBWriter {
         RocksDBSSTWriter writer = ensureSSTableWriter(columnFamilyHandle);
         // Insert the k/v.
         writer.put(key, value);
+        // Record the byte-size for the written key and value.
+        long currentSize = sstFileSizes.getOrDefault(columnFamilyHandle.getID(), 0L);
+        currentSize += key.length + value.length;
+        sstFileSizes.put(columnFamilyHandle.getID(), currentSize);
         // Flush the sst and ingest it, if it needs to be flushed.
         flushIfNeeded(columnFamilyHandle, writer);
     }
@@ -232,10 +239,22 @@ public class RocksDBSSTIngestWriter implements RocksDBWriter {
      */
     private void flushIfNeeded(ColumnFamilyHandle handle, RocksDBSSTWriter writer)
             throws RocksDBException {
-        // @lgo: fixme actually implement this.
-        if (false) {
-            flushAndCloseWriter(writer);
-            columnFamilyWriters.remove(writer.getColumnFamilyHandle().getID());
-        }
+        // @lgo: fixme this may not be necessary.
+        // - sst writer automatically invalidates the pages for the file writer
+        //   every 1mb.
+        // https://github.com/facebook/rocksdb/blob/096beb787eed5837a2e38a9681ee834e9268c881/table/sst_file_writer.cc#L102
+        // - the underlying block builder will flush based on the policy RocksDB
+        //   was set up with:
+        // https://github.com/facebook/rocksdb/blob/096beb787eed5837a2e38a9681ee834e9268c881/table/block_based/block_based_table_builder.cc#L773
+        // - based on table_options.block_size (and block_size_deviation), the FS automatically
+        // flushes.
+        //
+        // I could not actually find where/how this is configured.
+        return;
+        //		if (sstFileSizes.getOrDefault(handle.getID(), 0L) > maxSstSize) {
+        //			flushAndCloseWriter(writer);
+        //			columnFamilyWriters.remove(writer.getColumnFamilyHandle().getID());
+        //			sstFileSizes.remove(writer.getColumnFamilyHandle().getID());
+        //		}
     }
 }
