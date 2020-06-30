@@ -24,7 +24,6 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.configuration.CheckpointingOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.IllegalConfigurationException;
-import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.contrib.streaming.state.writer.RocksDBWriteBatchWrapper;
 import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
@@ -51,7 +50,6 @@ import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.AbstractID;
 import org.apache.flink.util.DynamicCodeLoadingException;
 import org.apache.flink.util.FlinkRuntimeException;
-import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TernaryBoolean;
 
 import org.rocksdb.ColumnFamilyOptions;
@@ -76,10 +74,10 @@ import java.util.Random;
 import java.util.UUID;
 
 import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM;
-import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_SIZE;
 import static org.apache.flink.contrib.streaming.state.RocksDBOptions.CHECKPOINT_TRANSFER_THREAD_NUM;
 import static org.apache.flink.contrib.streaming.state.RocksDBOptions.TIMER_SERVICE_FACTORY;
 import static org.apache.flink.contrib.streaming.state.RocksDBOptions.TTL_COMPACT_FILTER_ENABLED;
+import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -171,11 +169,6 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 
 	/** Whether we already lazily initialized our local storage directories. */
 	private transient boolean isInitialized;
-
-	/**
-	 * Max consumed memory size for one batch in {@link RocksDBWriteBatchWrapper}, default value 2mb.
-	 */
-	private long writeBatchSize;
 
 	/**
 	 * The mechanism to use for doing write batching, with {@link RocksDBWriterFactory}.
@@ -285,8 +278,6 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 		this.priorityQueueStateType = PriorityQueueStateType.HEAP;
 		this.defaultMetricOptions = new RocksDBNativeMetricOptions();
 		this.enableTtlCompactionFilter = TernaryBoolean.UNDEFINED;
-		this.memoryConfiguration = new RocksDBMemoryConfiguration();
-		this.writeBatchSize = UNDEFINED_WRITE_BATCH_SIZE;
 		this.writeBatchMechanism = null;
 	}
 
@@ -336,7 +327,7 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 		final String priorityQueueTypeString = config.getString(TIMER_SERVICE_FACTORY);
 
 		if (original.writeBatchMechanism == null) {
-			this.writeBatchMechanism = config.get(WRITE_BATCH_MECHANISM);
+			this.writeBatchMechanism = config.getEnum(WriteBatchMechanism.class, WRITE_BATCH_MECHANISM);
 		} else {
 			this.writeBatchMechanism = original.writeBatchMechanism;
 		}
@@ -518,7 +509,7 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 		LocalRecoveryConfig localRecoveryConfig =
 			env.getTaskStateManager().createLocalRecoveryConfig();
 
-		final RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(getWriteBatchMechanism(), getWriteBatchSize(), tempDir);
+		final RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(getWriteBatchMechanism(), tempDir);
 
 		ExecutionConfig executionConfig = env.getExecutionConfig();
 		StreamCompressionDecorator keyGroupCompressionDecorator = getCompressionDecorator(executionConfig);
@@ -862,7 +853,7 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 	 * @param numberOfTransferingThreads The number of threads used to transfer files while snapshotting/restoring.
 	 */
 	public void setNumberOfTransferingThreads(int numberOfTransferingThreads) {
-		Preconditions.checkArgument(numberOfTransferingThreads > 0,
+		checkArgument(numberOfTransferingThreads > 0,
 			"The number of threads used to transfer files in RocksDBStateBackend should be greater than zero.");
 		this.numberOfTransferingThreads = numberOfTransferingThreads;
 	}
@@ -872,18 +863,7 @@ public class RocksDBStateBackend extends AbstractStateBackend implements Configu
 	 */
 	public WriteBatchMechanism getWriteBatchMechanism() {
 		return writeBatchMechanism == null ?
-			WRITE_BATCH_MECHANISM.defaultValue() : writeBatchMechanism;
-	}
-
-	/**
-	 * Sets the max batch size will be used in {@link RocksDBWriteBatchWrapper},
-	 * no positive value will disable memory size controller, just use item count controller.
-	 * @param writeBatchSize The size will used to be used in {@link RocksDBWriteBatchWrapper}.
-	 */
-	public void setWriteBatchSize(int writeBatchSize) {
-		Preconditions.checkArgument(writeBatchSize > 0,
-			"The write batch size should be greater than zero.");
-		this.writeBatchSize = numberOfTransferingThreads;
+			WriteBatchMechanism.valueOf(WRITE_BATCH_MECHANISM.defaultValue()) : writeBatchMechanism;
 	}
 
 	// ------------------------------------------------------------------------

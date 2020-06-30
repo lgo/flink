@@ -406,7 +406,7 @@ public class RocksIncrementalCheckpointRescalingTest extends TestLogger {
 	private StateBackend getStateBackend() throws Exception {
 		RocksDBStateBackend backend = new RocksDBStateBackend("file://" + rootFolder.newFolder().getAbsolutePath(), true);
 		Configuration config = new Configuration();
-		config.set(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, writeBatchMechanism);
+		config.setString(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, writeBatchMechanism.toString());
 		return backend.configure(config, Thread.currentThread().getContextClassLoader());
 	}
 

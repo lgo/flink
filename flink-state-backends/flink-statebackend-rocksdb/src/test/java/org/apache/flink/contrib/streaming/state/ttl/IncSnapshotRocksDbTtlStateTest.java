@@ -31,7 +31,7 @@ public class IncSnapshotRocksDbTtlStateTest extends RocksDBTtlStateTestBase {
 	StateBackend createStateBackend() {
 		RocksDBStateBackend backend = createStateBackend(TernaryBoolean.TRUE);
 		Configuration config = new Configuration();
-		config.set(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, WriteBatchMechanism.WRITE_BATCH);
+		config.setString(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, WriteBatchMechanism.WRITE_BATCH.toString());
 		backend = backend.configure(config, Thread.currentThread().getContextClassLoader());
 		return backend;
 	}

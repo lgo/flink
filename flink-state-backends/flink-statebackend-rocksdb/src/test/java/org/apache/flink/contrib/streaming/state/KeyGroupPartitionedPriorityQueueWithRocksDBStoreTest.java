@@ -19,6 +19,7 @@
 package org.apache.flink.contrib.streaming.state;
 
 import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
+import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.runtime.state.InternalPriorityQueue;
@@ -59,7 +60,8 @@ public class KeyGroupPartitionedPriorityQueueWithRocksDBStoreTest extends Intern
 			DataInputDeserializer inputStreamWithPos = new DataInputDeserializer();
 			int keyGroupPrefixBytes = RocksDBKeySerializationUtils.computeRequiredBytesInKeyGroupPrefix(numKeyGroups);
 			TreeOrderedSetCache orderedSetCache = new TreeOrderedSetCache(32);
-			RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(WRITE_BATCH_MECHANISM.defaultValue());
+			RocksDBWriterFactory writeFactory = new RocksDBWriterFactory(
+				WriteBatchMechanism.valueOf(WRITE_BATCH_MECHANISM.defaultValue()));
 			return new RocksDBCachingPriorityQueueSet<>(
 				keyGroupId,
 				keyGroupPrefixBytes,

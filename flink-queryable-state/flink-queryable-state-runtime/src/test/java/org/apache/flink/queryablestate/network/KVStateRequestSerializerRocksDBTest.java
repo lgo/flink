@@ -27,10 +27,10 @@ import org.apache.flink.contrib.streaming.state.PredefinedOptions;
 import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend;
 import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackendBuilder;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
+import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
-import org.apache.flink.contrib.streaming.state.RocksDBTestUtils;
-import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.queryablestate.client.VoidNamespace;
 import org.apache.flink.queryablestate.client.VoidNamespaceSerializer;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
@@ -44,16 +44,16 @@ import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.rocksdb.DBOptions;
-
-import java.util.Collections;
-
-import static org.mockito.Mockito.mock;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.rocksdb.DBOptions;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+
+import static org.mockito.Mockito.mock;
+
 
 /**
  * Additional tests for the serialization and deserialization using
@@ -89,7 +89,7 @@ public final class KVStateRequestSerializerRocksDBTest {
 		dbOptions.setCreateIfMissing(true);
 		ExecutionConfig executionConfig = new ExecutionConfig();
 		final RocksDBKeyedStateBackend<Long> longHeapKeyedStateBackend =
-			new RocksDBKeyedStateBackendBuilder<>(
+			new RocksDBKeyedStateBackendBuilder<Long>(
 				"no-op",
 				ClassLoader.getSystemClassLoader(),
 				temporaryFolder.getRoot(),
@@ -107,7 +107,7 @@ public final class KVStateRequestSerializerRocksDBTest {
 				Collections.emptyList(),
 				AbstractStateBackend.getCompressionDecorator(executionConfig),
 				new CloseableRegistry(),
-				writeBatchMechanism
+				new RocksDBWriterFactory(writeBatchMechanism)
 			).build();
 		longHeapKeyedStateBackend.setCurrentKey(key);
 
@@ -134,7 +134,7 @@ public final class KVStateRequestSerializerRocksDBTest {
 		dbOptions.setCreateIfMissing(true);
 		ExecutionConfig executionConfig = new ExecutionConfig();
 		final RocksDBKeyedStateBackend<Long> longHeapKeyedStateBackend =
-			new RocksDBKeyedStateBackendBuilder<>(
+			new RocksDBKeyedStateBackendBuilder<Long>(
 				"no-op",
 				ClassLoader.getSystemClassLoader(),
 				temporaryFolder.getRoot(),
@@ -152,7 +152,7 @@ public final class KVStateRequestSerializerRocksDBTest {
 				Collections.emptyList(),
 				AbstractStateBackend.getCompressionDecorator(executionConfig),
 				new CloseableRegistry(),
-				writeBatchMechanism
+				new RocksDBWriterFactory(writeBatchMechanism)
 			).build();
 		longHeapKeyedStateBackend.setCurrentKey(key);
 

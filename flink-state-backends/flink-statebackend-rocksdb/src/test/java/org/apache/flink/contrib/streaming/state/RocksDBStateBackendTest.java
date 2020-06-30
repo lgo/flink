@@ -24,6 +24,7 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.writer.RocksDBWriterFactory;
 import org.apache.flink.contrib.streaming.state.writer.WriteBatchMechanism;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.core.testutils.OneShotLatch;
@@ -162,7 +163,7 @@ public class RocksDBStateBackendTest extends StateBackendTestBase<RocksDBStateBa
 		configuration.setString(
 			RocksDBOptions.TIMER_SERVICE_FACTORY,
 			RocksDBStateBackend.PriorityQueueStateType.ROCKSDB.toString());
-		configuration.set(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, writeBatchMechanism);
+		configuration.setString(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, writeBatchMechanism.toString());
 		backend = backend.configure(configuration, Thread.currentThread().getContextClassLoader());
 		backend.setDbStoragePath(dbPath);
 		return backend;
@@ -209,7 +210,7 @@ public class RocksDBStateBackendTest extends StateBackendTestBase<RocksDBStateBa
 		prepareRocksDB();
 		Environment env = new DummyEnvironment("TestTask", 1, 0);
 
-		keyedStateBackend = new RocksDBKeyedStateBackendBuilder<>(
+		keyedStateBackend = new RocksDBKeyedStateBackendBuilder<Integer>(
 			"Test",
 			Thread.currentThread().getContextClassLoader(),
 			instanceBasePath,
@@ -229,7 +230,7 @@ public class RocksDBStateBackendTest extends StateBackendTestBase<RocksDBStateBa
 			spy(db),
 			defaultCFHandle,
 			new CloseableRegistry(),
-			writeBatchMechanism)
+			new RocksDBWriterFactory(writeBatchMechanism))
 			.setEnableIncrementalCheckpointing(enableIncrementalCheckpointing)
 			.build();
 
@@ -289,7 +290,7 @@ public class RocksDBStateBackendTest extends StateBackendTestBase<RocksDBStateBa
 		RocksDBKeyedStateBackend<Integer> test = null;
 		try (DBOptions options = new DBOptions().setCreateIfMissing(true)) {
 			ExecutionConfig executionConfig = new ExecutionConfig();
-			test = new RocksDBKeyedStateBackendBuilder<>(
+			test = new RocksDBKeyedStateBackendBuilder<Integer>(
 				"test",
 				Thread.currentThread().getContextClassLoader(),
 				tempFolder.newFolder(),
@@ -309,7 +310,7 @@ public class RocksDBStateBackendTest extends StateBackendTestBase<RocksDBStateBa
 				db,
 				defaultCFHandle,
 				new CloseableRegistry(),
-				writeBatchMechanism)
+				new RocksDBWriterFactory(writeBatchMechanism))
 				.setEnableIncrementalCheckpointing(enableIncrementalCheckpointing)
 				.build();
 			ValueStateDescriptor<String> stubState1 =

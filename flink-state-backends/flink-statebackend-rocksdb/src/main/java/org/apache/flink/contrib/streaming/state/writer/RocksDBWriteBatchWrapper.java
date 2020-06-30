@@ -60,13 +60,17 @@ public class RocksDBWriteBatchWrapper implements RocksDBWriter {
 	}
 
 	public RocksDBWriteBatchWrapper(@Nonnull RocksDB rocksDB, @Nullable WriteOptions options, int capacity) {
-		Preconditions.checkArgument(capacity >= MIN_CAPACITY && capacity <= MAX_CAPACITY,
-			"capacity should be between " + MIN_CAPACITY + " and " + MAX_CAPACITY);
+		Preconditions.checkArgument(capacity == 0 || (capacity >= MIN_CAPACITY && capacity <= MAX_CAPACITY),
+			"capacity should be between " + MIN_CAPACITY + " and " + MAX_CAPACITY + " but got " + capacity);
 
 		this.db = rocksDB;
 		this.options = options;
 		this.capacity = capacity;
-		this.batch = new WriteBatch(this.capacity * PER_RECORD_BYTES);
+		if (capacity == 0) {
+			this.batch = new WriteBatch();
+		} else {
+			this.batch = new WriteBatch(this.capacity * PER_RECORD_BYTES);
+		}
 	}
 
 	public void put(

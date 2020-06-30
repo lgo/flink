@@ -71,7 +71,7 @@ public class RocksDBStateBackendMigrationTest extends StateBackendMigrationTestB
 		configuration.setString(
 			RocksDBOptions.TIMER_SERVICE_FACTORY,
 			RocksDBStateBackend.PriorityQueueStateType.ROCKSDB.toString());
-		configuration.set(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, writeBatchMechanism);
+		configuration.setString(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, writeBatchMechanism.toString());
 		backend = backend.configure(configuration, Thread.currentThread().getContextClassLoader());
 		backend.setDbStoragePath(dbPath);
 		return backend;

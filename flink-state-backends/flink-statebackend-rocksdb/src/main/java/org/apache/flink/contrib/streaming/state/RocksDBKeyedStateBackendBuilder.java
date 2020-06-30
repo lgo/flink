@@ -112,8 +112,8 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 	private boolean enableTtlCompactionFilter;
 	private RocksDBNativeMetricOptions nativeMetricOptions;
 	private int numberOfTransferingThreads;
-	private long writeBatchSize = RocksDBConfigurableOptions.WRITE_BATCH_SIZE.defaultValue().getBytes();
 	private RocksDBWriterFactory writeFactory;
+	private RocksDBWriteBatchWrapper writeBatchWrapper;
 
 	private RocksDB injectedTestDB; // for testing
 	private ColumnFamilyHandle injectedDefaultColumnFamilyHandle; // for testing
@@ -229,16 +229,6 @@ public class RocksDBKeyedStateBackendBuilder<K> extends AbstractKeyedStateBacken
 	RocksDBKeyedStateBackendBuilder<K> setNumberOfTransferingThreads(int numberOfTransferingThreads) {
 		this.numberOfTransferingThreads = numberOfTransferingThreads;
 		return this;
-	}
-
-	RocksDBKeyedStateBackendBuilder<K> setWriteBatchSize(long writeBatchSize) {
-		checkArgument(writeBatchSize >= 0, "Write batch size should be non negative.");
-		this.writeBatchSize = writeBatchSize;
-		return this;
-	}
-
-	private long getWriteBatchSize() {
-		return writeBatchSize;
 	}
 
 	private RocksDBWriterFactory getWriterFactory() {

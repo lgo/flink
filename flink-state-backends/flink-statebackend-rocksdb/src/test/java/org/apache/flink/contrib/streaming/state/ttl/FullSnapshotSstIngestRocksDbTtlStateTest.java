@@ -31,7 +31,7 @@ public class FullSnapshotSstIngestRocksDbTtlStateTest extends RocksDBTtlStateTes
 	StateBackend createStateBackend() {
 		RocksDBStateBackend backend = createStateBackend(TernaryBoolean.FALSE);
 		Configuration config = new Configuration();
-		config.set(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, WriteBatchMechanism.SST_INGEST);
+		config.setString(RocksDBConfigurableOptions.WRITE_BATCH_MECHANISM, WriteBatchMechanism.SST_INGEST.toString());
 		backend = backend.configure(config, Thread.currentThread().getContextClassLoader());
 		return backend;
 	}

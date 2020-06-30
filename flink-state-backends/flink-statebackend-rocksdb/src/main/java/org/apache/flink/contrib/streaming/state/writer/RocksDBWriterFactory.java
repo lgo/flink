@@ -32,8 +32,6 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 
-import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOptions.WRITE_BATCH_SIZE;
-
 /**
  * {@link RocksDBWriterFactory} creates writers for {@link RocksDB}. It is initialized from an
  * application's configuration, and provides a default {@link RocksDBWriter} (for Put operations),
@@ -46,7 +44,6 @@ import static org.apache.flink.contrib.streaming.state.RocksDBConfigurableOption
 public class RocksDBWriterFactory {
 
 	private final WriteBatchMechanism mechanism;
-	private final long writeBatchSize;
 
 	private final File tempDir;
 
@@ -57,12 +54,10 @@ public class RocksDBWriterFactory {
 	 * implementation.
 	 *  @param mechanism The {@link WriteBatchMechanism} which determines the default writer
 	 *     returned by {@link #defaultPutWriter(RocksDB, Options, EnvOptions, WriteOptions)}.
-	 * @param writeBatchSize A parameter for {@link RocksDBWriteBatchWrapper}.
 	 * @param tempDir THe temporary directory to write sst files to.
 	 */
-	public RocksDBWriterFactory(WriteBatchMechanism mechanism, long writeBatchSize, String tempDir) {
+	public RocksDBWriterFactory(WriteBatchMechanism mechanism, String tempDir) {
 		this.mechanism = mechanism;
-		this.writeBatchSize = writeBatchSize;
 		this.tempDir = new File(tempDir);
 	}
 
@@ -74,7 +69,6 @@ public class RocksDBWriterFactory {
 	@VisibleForTesting
 	public RocksDBWriterFactory(WriteBatchMechanism writeBatchMechanism) {
 		this.mechanism = writeBatchMechanism;
-		this.writeBatchSize = WRITE_BATCH_SIZE.defaultValue().getBytes();
 		this.tempDir = null;
 	}
 
@@ -117,7 +111,7 @@ public class RocksDBWriterFactory {
 	 * @return a new {@link RocksDBWriteBatchWrapper} for writing to the {@code db}.
 	 */
 	public RocksDBWriteBatchWrapper writeBatchWriter(@Nonnull RocksDB db) {
-		return new RocksDBWriteBatchWrapper(db, writeBatchSize);
+		return new RocksDBWriteBatchWrapper(db, null);
 	}
 
 	/**
@@ -130,7 +124,7 @@ public class RocksDBWriterFactory {
 	 */
 	public RocksDBWriteBatchWrapper writeBatchWriter(
 		@Nonnull RocksDB db, @Nullable WriteOptions writeOptions) {
-		return new RocksDBWriteBatchWrapper(db, writeOptions, writeBatchSize);
+		return new RocksDBWriteBatchWrapper(db, writeOptions);
 	}
 
 	/**
