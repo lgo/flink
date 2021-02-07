@@ -22,8 +22,11 @@ import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -35,6 +38,8 @@ import java.util.function.BiFunction;
 
 /** Utils for RocksDB Incremental Checkpoint. */
 public class RocksDBIncrementalCheckpointUtils {
+
+    public static boolean useFastMode = false;
 
     /**
      * The threshold of the overlap fraction of the handle's key-group range with target key-group
@@ -83,7 +88,8 @@ public class RocksDBIncrementalCheckpointUtils {
             @Nonnull List<ColumnFamilyHandle> columnFamilyHandles,
             @Nonnull KeyGroupRange targetKeyGroupRange,
             @Nonnull KeyGroupRange currentKeyGroupRange,
-            @Nonnegative int keyGroupPrefixBytes)
+            @Nonnegative int keyGroupPrefixBytes,
+            @Nonnegative long writeBatchSize)
             throws RocksDBException {
 
         final byte[] beginKeyGroupBytes = new byte[keyGroupPrefixBytes];
@@ -94,7 +100,8 @@ public class RocksDBIncrementalCheckpointUtils {
                     currentKeyGroupRange.getStartKeyGroup(), beginKeyGroupBytes);
             CompositeKeySerializationUtils.serializeKeyGroup(
                     targetKeyGroupRange.getStartKeyGroup(), endKeyGroupBytes);
-            deleteRange(db, columnFamilyHandles, beginKeyGroupBytes, endKeyGroupBytes);
+            deleteRange(
+                    db, columnFamilyHandles, beginKeyGroupBytes, endKeyGroupBytes, writeBatchSize);
         }
 
         if (currentKeyGroupRange.getEndKeyGroup() > targetKeyGroupRange.getEndKeyGroup()) {
@@ -102,8 +109,20 @@ public class RocksDBIncrementalCheckpointUtils {
                     targetKeyGroupRange.getEndKeyGroup() + 1, beginKeyGroupBytes);
             CompositeKeySerializationUtils.serializeKeyGroup(
                     currentKeyGroupRange.getEndKeyGroup() + 1, endKeyGroupBytes);
-            deleteRange(db, columnFamilyHandles, beginKeyGroupBytes, endKeyGroupBytes);
+            deleteRange(
+                    db, columnFamilyHandles, beginKeyGroupBytes, endKeyGroupBytes, writeBatchSize);
         }
+    }
+
+    protected static final Logger LOG =
+            LoggerFactory.getLogger(RocksDBIncrementalCheckpointUtils.class);
+
+    private static String hexString(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
 
     /**
@@ -118,17 +137,52 @@ public class RocksDBIncrementalCheckpointUtils {
             RocksDB db,
             List<ColumnFamilyHandle> columnFamilyHandles,
             byte[] beginKeyBytes,
-            byte[] endKeyBytes)
+            byte[] endKeyBytes,
+            @Nonnegative long writeBatchSize)
             throws RocksDBException {
 
         for (ColumnFamilyHandle columnFamilyHandle : columnFamilyHandles) {
-            // Using RocksDB's deleteRange will take advantage of delete
-            // tombstones, which mark the range as deleted. There are situations
-            // where tombstones can cause degraded performance, such as when
-            // too many tombstones are created.
-            //
-            // https://github.com/facebook/rocksdb/blob/bcd32560dd5898956b9d24553c2bb3c1b1d2319f/include/rocksdb/db.h#L357-L371
-            db.deleteRange(columnFamilyHandle, beginKeyBytes, endKeyBytes);
+            if (useFastMode) {
+                LOG.error(
+                        "deleteRange fast mode for columnFamily={} over begin={} to end={}",
+                        columnFamilyHandle.getID(),
+                        hexString(beginKeyBytes),
+                        hexString(endKeyBytes));
+                // Using RocksDB's deleteRange will take advantage of delete
+                // tombstones, which mark the range as deleted. There are situations
+                // where tombstones can cause degraded performance, such as when
+                // too many tombstones are created.
+                //
+                // https://github.com/facebook/rocksdb/blob/bcd32560dd5898956b9d24553c2bb3c1b1d2319f/include/rocksdb/db.h#L357-L371
+                db.deleteRange(columnFamilyHandle, beginKeyBytes, endKeyBytes);
+            } else {
+                LOG.error(
+                        "deleteRange slow mode for columnFamily={} over begin={} to end={}",
+                        columnFamilyHandle.getID(),
+                        hexString(beginKeyBytes),
+                        hexString(endKeyBytes));
+                try (ReadOptions readOptions =
+                                RocksDBOperationUtils.createTotalOrderSeekReadOptions();
+                        RocksIteratorWrapper iteratorWrapper =
+                                RocksDBOperationUtils.getRocksIterator(
+                                        db, columnFamilyHandle, readOptions);
+                        RocksDBWriteBatchWrapper writeBatchWrapper =
+                                new RocksDBWriteBatchWrapper(db, writeBatchSize)) {
+
+                    iteratorWrapper.seek(beginKeyBytes);
+
+                    while (iteratorWrapper.isValid()) {
+                        final byte[] currentKey = iteratorWrapper.key();
+                        if (beforeThePrefixBytes(currentKey, endKeyBytes)) {
+                            db.delete(columnFamilyHandle, currentKey);
+                            // writeBatchWrapper.remove(columnFamilyHandle, currentKey);
+                        } else {
+                            break;
+                        }
+                        iteratorWrapper.next();
+                    }
+                }
+            }
         }
     }
 

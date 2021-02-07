@@ -39,18 +39,29 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
 /** Test runs the benchmark for incremental checkpoint rescaling. */
+@RunWith(Parameterized.class)
 public class RocksIncrementalCheckpointRescalingBenchmarkTest extends TestLogger {
+
+    @Parameterized.Parameters(name = "Use rescaling fast mode: {0}")
+    public static Collection<Boolean> parameters() {
+        return Arrays.asList(false, true);
+    }
+
+    @Parameterized.Parameter public boolean useRescalingFastMode;
 
     @Rule public TemporaryFolder rootFolder = new TemporaryFolder();
 
     private static final int maxParallelism = 10;
 
-    private static final int recordCount = 1_000;
+    private static final int recordCount = 200_000;
 
     /** partitionParallelism is the parallelism to use for creating the partitionedSnapshot. */
     private static final int partitionParallelism = 2;
@@ -75,7 +86,7 @@ public class RocksIncrementalCheckpointRescalingBenchmarkTest extends TestLogger
      *
      * <ol>
      *   <li>Create a stateful operator and process records to persist state.
-     *   <li>Snapshot the state and re-partition it so the test operates on a partitioned state.
+     *   <li>Snapshot the state and re-partition it to repartition state.
      * </ol>
      *
      * @throws Exception
@@ -135,6 +146,9 @@ public class RocksIncrementalCheckpointRescalingBenchmarkTest extends TestLogger
     @Test(timeout = 1000)
     @RetryOnFailure(times = 3)
     public void benchmarkScalingUp() throws Exception {
+        // Set the mode in the class.
+        RocksDBIncrementalCheckpointUtils.useFastMode = useRescalingFastMode;
+
         long benchmarkTime = 0;
 
         // Trigger the incremental re-scaling via restoreWithRescaling by repartitioning it from
@@ -145,6 +159,7 @@ public class RocksIncrementalCheckpointRescalingBenchmarkTest extends TestLogger
                         maxParallelism, repartitionParallelism);
 
         long fullStateSize = partitionedSnapshot.getStateSize();
+        log.error("state size for all data: {}", fullStateSize);
 
         for (int i = 0; i < repartitionParallelism; i++) {
             // @lgo: fixme only load one subtask.
@@ -168,13 +183,19 @@ public class RocksIncrementalCheckpointRescalingBenchmarkTest extends TestLogger
                 long startingTime = System.nanoTime();
                 subtaskHarness.initializeState(subtaskState);
                 benchmarkTime += System.nanoTime() - startingTime;
+
+                subtaskHarness.open();
+                OperatorSubtaskState nextSnapshot = subtaskHarness.snapshot(2, 3);
+                long stateSize = nextSnapshot.getStateSize();
+                log.error("state size for subtask={} is: {}", i, stateSize);
             }
         }
 
         log.error(
                 "--------------> performance for incremental checkpoint re-scaling <--------------");
         log.error(
-                "rescale from {} to {} with {} records took: {} nanoseconds",
+                "useFastMode={} rescale from {} to {} with {} records took: {} nanoseconds",
+                useRescalingFastMode,
                 partitionParallelism,
                 repartitionParallelism,
                 recordCount,
